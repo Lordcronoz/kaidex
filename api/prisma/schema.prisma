@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CLIENT
+  ADMIN
+}
+
+enum ProjectStatus {
+  DRAFT
+  IN_PROGRESS
+  REVIEW
+  COMPLETED
+  ARCHIVED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  name         String?
+  role         Role      @default(CLIENT)
+  mfaSecret    String?   @map("mfa_secret") // Encrypted at application level
+  mfaEnabled   Boolean   @default(false) @map("mfa_enabled")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  projects     Project[]
+  invoices     Invoice[]
+  sentMessages     Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
+  auditLogs    AuditLog[]
+
+  @@map("users")
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  userId      String        @map("user_id")
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  status      ProjectStatus @default(DRAFT)
+  deliverables Deliverable[]
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("projects")
+}
+
+model Deliverable {
+  id        String   @id @default(cuid())
+  projectId String   @map("project_id")
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title     String
+  fileUrl   String?  @map("file_url")
+  completed Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([projectId])
+  @@map("deliverables")
+}
+
+model Invoice {
+  id        String        @id @default(cuid())
+  userId    String        @map("user_id")
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  number    String        @unique // e.g. INV-2026-001
+  amount    Decimal       @db.Decimal(12, 2)
+  currency  String        @default("USD")
+  status    InvoiceStatus @default(DRAFT)
+  dueDate   DateTime?     @map("due_date")
+  paidAt    DateTime?     @map("paid_at")
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("invoices")
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  senderId   String   @map("sender_id")
+  sender     User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId String   @map("receiver_id")
+  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  content    String
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([senderId])
+  @@index([receiverId])
+  @@map("messages")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String   // CREATE, UPDATE, DELETE
+  target    String   // "Project", "Invoice", "User", etc.
+  targetId  String   @map("target_id")
+  metadata  Json?    // before/after snapshot
+  ipAddress String?  @map("ip_address")
+  timestamp DateTime @default(now())
+
+  @@index([userId])
+  @@index([target, targetId])
+  @@index([timestamp])
+  @@map("audit_logs")
+}

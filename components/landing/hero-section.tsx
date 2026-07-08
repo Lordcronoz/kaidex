@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { KanaRain } from "./kana-rain";
 
 const words = ["automate", "delegate", "execute", "scale"];
 
 function BlurWord({ word, trigger }: { word: string; trigger: number }) {
   const letters = word.split("");
-  const STAGGER = 45;      // ms between each letter
-  const DURATION = 500;    // blur+opacity fade duration per letter
+  const STAGGER = 45;
+  const DURATION = 500;
   const GRADIENT_HOLD = STAGGER * letters.length + DURATION + 200;
 
   const [letterStates, setLetterStates] = useState<{ opacity: number; blur: number }[]>(
@@ -18,7 +19,6 @@ function BlurWord({ word, trigger }: { word: string; trigger: number }) {
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
-    // reset
     framesRef.current.forEach(cancelAnimationFrame);
     timersRef.current.forEach(clearTimeout);
     framesRef.current = [];
@@ -27,7 +27,6 @@ function BlurWord({ word, trigger }: { word: string; trigger: number }) {
     setLetterStates(letters.map(() => ({ opacity: 0, blur: 20 })));
     setShowGradient(true);
 
-    // stagger each letter
     letters.forEach((_, i) => {
       const t = setTimeout(() => {
         const start = performance.now();
@@ -50,7 +49,6 @@ function BlurWord({ word, trigger }: { word: string; trigger: number }) {
       timersRef.current.push(t);
     });
 
-    // remove gradient once all letters are settled
     const gt = setTimeout(() => setShowGradient(false), GRADIENT_HOLD);
     timersRef.current.push(gt);
 
@@ -61,7 +59,6 @@ function BlurWord({ word, trigger }: { word: string; trigger: number }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trigger]);
 
-  // gradient colours cycling across letter positions
   const gradientColors = ["#eca8d6", "#a78bfa", "#67e8f9", "#fbbf24", "#eca8d6"];
 
   return (
@@ -72,7 +69,6 @@ function BlurWord({ word, trigger }: { word: string; trigger: number }) {
         const upper = Math.min(lower + 1, gradientColors.length - 1);
         const t = colorIndex - lower;
 
-        // lerp hex colours
         const hex2rgb = (hex: string) => {
           const r = parseInt(hex.slice(1, 3), 16);
           const g = parseInt(hex.slice(3, 5), 16);
@@ -120,30 +116,20 @@ export function HeroSection() {
   }, []);
 
   return (
-    <section className="relative min-h-screen flex flex-col justify-center items-start overflow-hidden bg-black">
-      {/* Background video */}
-      <div className="absolute inset-0 z-0">
-        <video
-          autoPlay
-          muted
-          loop
-          playsInline
-          aria-hidden="true"
-          className="w-full h-full object-cover object-center opacity-80"
-        >
-          <source src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/bg-hero-0BnFGdr81Ifnj3WbBZoNt1KE4D5DMT.mp4" type="video/mp4" />
-        </video>
-        {/* Subtle overlay to ensure text readability on the left */}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/30 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/60" />
-      </div>
+    <section className="relative min-h-screen flex flex-col justify-center items-start overflow-hidden bg-background">
+      {/* Katakana drift canvas — replaces video background */}
+      <KanaRain />
+
+      {/* Gradient overlays for text readability */}
+      <div className="absolute inset-0 z-[1] bg-gradient-to-r from-background/80 via-background/40 to-transparent" />
+      <div className="absolute inset-0 z-[1] bg-gradient-to-b from-background/30 via-transparent to-background/70" />
 
       {/* Subtle grid lines */}
       <div className="absolute inset-0 z-[2] overflow-hidden pointer-events-none opacity-20">
         {[...Array(8)].map((_, i) => (
           <div
             key={`h-${i}`}
-            className="absolute h-px bg-white/10"
+            className="absolute h-px bg-foreground/10"
             style={{
               top: `${12.5 * (i + 1)}%`,
               left: 0,
@@ -154,7 +140,7 @@ export function HeroSection() {
         {[...Array(12)].map((_, i) => (
           <div
             key={`v-${i}`}
-            className="absolute w-px bg-white/10"
+            className="absolute w-px bg-foreground/10"
             style={{
               left: `${8.33 * (i + 1)}%`,
               top: 0,
@@ -172,8 +158,8 @@ export function HeroSection() {
             isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
           }`}
         >
-          <span className="inline-flex items-center gap-3 text-sm font-mono text-white/60">
-            <span className="w-8 h-px bg-white/30" />
+          <span className="inline-flex items-center gap-3 text-sm font-mono text-foreground/60">
+            <span className="w-8 h-px bg-foreground/30" />
             Autonomous AI agents for distributed computing
           </span>
         </div>
@@ -181,7 +167,7 @@ export function HeroSection() {
         {/* Main headline */}
         <div className="mb-12">
           <h1 
-            className={`text-left text-[clamp(2rem,6vw,7rem)] font-display leading-[0.92] tracking-tight text-white transition-all duration-1000 ${
+            className={`text-left text-[clamp(2rem,6vw,7rem)] font-display leading-[0.92] tracking-tight text-foreground transition-all duration-1000 ${
               isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
             }`}
           >
@@ -197,7 +183,7 @@ export function HeroSection() {
         </div>
       </div>
       
-      {/* Stats — 3 metrics static, no auto-scroll */}
+      {/* Stats — 3 metrics static */}
       <div 
         className={`absolute bottom-12 left-0 right-0 px-6 lg:px-12 transition-all duration-700 delay-500 ${
           isVisible ? "opacity-100" : "opacity-0"
@@ -210,16 +196,14 @@ export function HeroSection() {
             { value: "<50ms", label: "execution latency" },
           ].map((stat) => (
             <div key={stat.label} className="flex flex-col gap-2">
-              <span className="text-3xl lg:text-4xl font-display text-white">{stat.value}</span>
-              <span className="text-xs text-white/50 leading-tight">
+              <span className="text-3xl lg:text-4xl font-display text-foreground">{stat.value}</span>
+              <span className="text-xs text-foreground/50 leading-tight">
                 {stat.label}
               </span>
             </div>
           ))}
         </div>
       </div>
-
-      {/* Scroll indicator */}
 
     </section>
   );
