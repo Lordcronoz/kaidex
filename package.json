@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "postinstall": "pnpm --filter kaidex-api run prisma:generate"
+    "postinstall": "pnpm --filter kaidex-api run prisma:generate || exit 0"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
