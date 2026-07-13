@@ -1,8 +1,10 @@
 import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
-import { authenticator } from 'otplib';
+import * as otplib from 'otplib';
 import { loginSchema } from '@shared/schemas/auth.schema';
+
+const authenticator = (otplib as any).authenticator || otplib.authenticator;
 
 @Injectable()
 export class AuthService {

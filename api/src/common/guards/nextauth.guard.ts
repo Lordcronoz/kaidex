@@ -24,8 +24,8 @@ export class NextAuthGuard implements CanActivate {
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest<Request>();
-    const authHeader = request.headers.authorization;
+    const request = context.switchToHttp().getRequest<any>();
+    const authHeader = request.headers?.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       throw new UnauthorizedException('Missing or invalid authorization header');
