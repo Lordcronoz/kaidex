@@ -5,13 +5,24 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Request } from 'express';
+import { jwtVerify } from 'jose';
 
 /**
  * Validates the NextAuth session token passed in the Authorization header.
- * In production, this verifies the JWT issued by Auth.js on the Next.js side.
+ * Verifies the JWT signature using NEXTAUTH_SECRET and checks expiration.
  */
 @Injectable()
 export class NextAuthGuard implements CanActivate {
+  private readonly secret: Uint8Array;
+
+  constructor() {
+    const secretStr = process.env.NEXTAUTH_SECRET;
+    if (!secretStr) {
+      throw new Error('NEXTAUTH_SECRET environment variable is not set');
+    }
+    this.secret = new TextEncoder().encode(secretStr);
+  }
+
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
     const authHeader = request.headers.authorization;
@@ -23,24 +34,29 @@ export class NextAuthGuard implements CanActivate {
     const token = authHeader.split(' ')[1];
 
     try {
-      // In production, decode and verify the JWT from Auth.js
-      // For now, we decode the payload (the Next.js middleware will have
-      // already verified the token; this is a secondary check)
-      const payload = JSON.parse(
-        Buffer.from(token.split('.')[1], 'base64').toString()
-      );
+      const { payload } = await jwtVerify(token, this.secret, {
+        clockTolerance: 15, // 15 seconds clock tolerance
+      });
 
-      // Attach user info to the request
+      // Check expiration explicitly (jose checks it, but be defensive)
+      if (payload.exp && Date.now() >= payload.exp * 1000) {
+        throw new UnauthorizedException('Token has expired');
+      }
+
+      // Attach verified user info to the request
       (request as any).user = {
-        id: payload.sub,
+        id: payload.sub || payload.id,
         email: payload.email,
         role: payload.role || 'CLIENT',
         name: payload.name,
       };
 
       return true;
-    } catch {
-      throw new UnauthorizedException('Invalid token');
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      throw new UnauthorizedException('Invalid or expired token');
     }
   }
 }

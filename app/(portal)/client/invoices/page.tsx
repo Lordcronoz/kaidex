@@ -2,33 +2,44 @@
 
 import { StatusBadge } from "@/components/portal/status-badge";
 import { DataTable } from "@/components/portal/data-table";
+import { useApi } from "@/hooks/use-api";
 
 interface Invoice {
   id: string;
   number: string;
-  amount: string;
+  amount: string | number;
+  currency: string;
   status: string;
-  dueDate: string;
-  project: string;
+  dueDate: string | null;
+  user?: { name: string; email: string };
 }
 
-const invoices: Invoice[] = [
-  { id: "1", number: "INV-2026-014", amount: "$2,400.00", status: "SENT", dueDate: "Jul 20, 2026", project: "AI Agent Fleet v2" },
-  { id: "2", number: "INV-2026-013", amount: "$1,800.00", status: "SENT", dueDate: "Jul 15, 2026", project: "Data Pipeline Optimization" },
-  { id: "3", number: "INV-2026-012", amount: "$3,600.00", status: "PAID", dueDate: "Jun 30, 2026", project: "Security Audit Q3" },
-  { id: "4", number: "INV-2026-011", amount: "$1,200.00", status: "PAID", dueDate: "Jun 15, 2026", project: "AI Agent Fleet v2" },
-  { id: "5", number: "INV-2026-010", amount: "$4,800.00", status: "PAID", dueDate: "May 31, 2026", project: "Infrastructure Migration" },
-  { id: "6", number: "INV-2026-009", amount: "$900.00", status: "OVERDUE", dueDate: "May 15, 2026", project: "Data Pipeline Optimization" },
-];
+interface InvoicesResponse {
+  data: Invoice[];
+  meta: { total: number; page: number; limit: number; totalPages: number };
+}
+
+function formatCurrency(amount: string | number, currency = "USD") {
+  const num = typeof amount === "string" ? parseFloat(amount) : amount;
+  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(num);
+}
+
+function formatDate(dateStr: string | null) {
+  if (!dateStr) return "—";
+  return new Date(dateStr).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 const columns = [
   { key: "number" as const, label: "Invoice", className: "font-mono" },
-  { key: "project" as const, label: "Project" },
   {
     key: "amount" as const,
     label: "Amount",
     className: "font-mono text-right",
-    render: (i: Invoice) => <span className="font-mono">{i.amount}</span>,
+    render: (i: Invoice) => <span className="font-mono">{formatCurrency(i.amount, i.currency)}</span>,
   },
   {
     key: "status" as const,
@@ -39,13 +50,21 @@ const columns = [
     key: "dueDate" as const,
     label: "Due Date",
     className: "text-muted-foreground",
+    render: (i: Invoice) => <span>{formatDate(i.dueDate)}</span>,
   },
 ];
 
 export default function InvoicesPage() {
+  const { data, loading, error } = useApi<InvoicesResponse>("/invoices");
+
+  const invoices = data?.data || [];
+
   const totalDue = invoices
     .filter((i) => i.status === "SENT" || i.status === "OVERDUE")
-    .reduce((sum, i) => sum + parseFloat(i.amount.replace(/[$,]/g, "")), 0);
+    .reduce((sum, i) => {
+      const amt = typeof i.amount === "string" ? parseFloat(i.amount) : i.amount;
+      return sum + (isNaN(amt) ? 0 : amt);
+    }, 0);
 
   return (
     <div className="space-y-6">
@@ -58,11 +77,25 @@ export default function InvoicesPage() {
         </div>
         <div className="text-right">
           <p className="text-xs text-muted-foreground font-mono">Outstanding</p>
-          <p className="text-xl font-display">${totalDue.toLocaleString("en-US", { minimumFractionDigits: 2 })}</p>
+          <p className="text-xl font-display">
+            {loading ? "—" : formatCurrency(totalDue)}
+          </p>
         </div>
       </div>
 
-      <DataTable columns={columns} data={invoices} />
+      {loading ? (
+        <div className="space-y-2">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-14 bg-accent/30 rounded-md animate-pulse" />
+          ))}
+        </div>
+      ) : error ? (
+        <div className="p-4 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-md">
+          {error}
+        </div>
+      ) : (
+        <DataTable columns={columns} data={invoices} emptyMessage="No invoices found" />
+      )}
     </div>
   );
 }

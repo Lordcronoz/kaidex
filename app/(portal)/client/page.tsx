@@ -4,24 +4,57 @@ import { FolderKanban, FileText, MessageSquare, Clock } from "lucide-react";
 import { StatCard } from "@/components/portal/stat-card";
 import { MiniChart } from "@/components/portal/mini-chart";
 import { StatusBadge } from "@/components/portal/status-badge";
-
-// Mock data — will be replaced with API calls
-const recentProjects = [
-  { id: "1", title: "AI Agent Fleet v2", status: "IN_PROGRESS", updated: "2h ago" },
-  { id: "2", title: "Data Pipeline Optimization", status: "REVIEW", updated: "1d ago" },
-  { id: "3", title: "Security Audit Q3", status: "COMPLETED", updated: "3d ago" },
-];
-
-const recentActivity = [
-  { id: "1", text: "Deliverable uploaded: Architecture diagram v3", time: "35 min ago" },
-  { id: "2", text: "Invoice #INV-2026-012 marked as paid", time: "2h ago" },
-  { id: "3", text: "New message from Kaidex team", time: "4h ago" },
-  { id: "4", text: "Project status changed: AI Agent Fleet v2 → In Progress", time: "1d ago" },
-];
+import { useApi } from "@/hooks/use-api";
 
 const weeklyActivity = [12, 18, 14, 22, 19, 25, 21, 28, 24, 30, 27, 32];
 
+interface Project {
+  id: string;
+  title: string;
+  status: string;
+  updatedAt: string;
+}
+
+interface ProjectsResponse {
+  data: Project[];
+  meta: { total: number };
+}
+
+interface InvoicesResponse {
+  data: { id: string; status: string; amount: string }[];
+  meta: { total: number };
+}
+
+interface MessagesResponse {
+  data: { id: string }[];
+  meta: { total: number };
+}
+
 export default function ClientDashboard() {
+  const projects = useApi<ProjectsResponse>("/projects?limit=3&sortBy=updatedAt");
+  const invoices = useApi<InvoicesResponse>("/invoices?limit=100");
+  const messages = useApi<MessagesResponse>("/messages?limit=100");
+
+  const projectData = projects.data?.data || [];
+  const projectCount = projects.data?.meta?.total || 0;
+
+  const pendingInvoices = invoices.data?.data?.filter(
+    (i) => i.status === "SENT" || i.status === "OVERDUE"
+  ) || [];
+
+  const unreadMessages = messages.data?.meta?.total || 0;
+
+  const isLoading = projects.loading || invoices.loading || messages.loading;
+
+  function timeAgo(dateStr: string) {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const hours = Math.floor(diff / 3600000);
+    if (hours < 1) return "just now";
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  }
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -32,26 +65,26 @@ export default function ClientDashboard() {
         </p>
       </div>
 
-      {/* Stats row — varied widths, not a uniform grid */}
+      {/* Stats row */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="Active Projects"
-          value={3}
-          change="+1 this month"
+          value={isLoading ? "—" : projectCount}
+          change={isLoading ? "" : `${projectCount} total`}
           trend="up"
           icon={<FolderKanban className="w-4 h-4" />}
         />
         <StatCard
           label="Pending Invoices"
-          value={2}
-          change="$4,200 due"
+          value={isLoading ? "—" : pendingInvoices.length}
+          change={isLoading ? "" : `${pendingInvoices.length} outstanding`}
           trend="neutral"
           icon={<FileText className="w-4 h-4" />}
         />
         <StatCard
-          label="Unread Messages"
-          value={5}
-          change="3 new today"
+          label="Messages"
+          value={isLoading ? "—" : unreadMessages}
+          change={isLoading ? "" : "total"}
           trend="up"
           icon={<MessageSquare className="w-4 h-4" />}
         />
@@ -74,22 +107,39 @@ export default function ClientDashboard() {
               View all →
             </a>
           </div>
-          <div className="space-y-3">
-            {recentProjects.map((project) => (
-              <div
-                key={project.id}
-                className="flex items-center gap-4 p-4 bg-card border border-border rounded-md hover:border-foreground/20 transition-colors group"
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate group-hover:text-foreground transition-colors">
-                    {project.title}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Updated {project.updated}</p>
+
+          {projects.loading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-16 bg-accent/30 rounded-md animate-pulse" />
+              ))}
+            </div>
+          ) : projects.error ? (
+            <div className="p-4 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-md">
+              {projects.error}
+            </div>
+          ) : projectData.length === 0 ? (
+            <div className="p-8 text-center text-sm text-muted-foreground border border-dashed border-border rounded-md">
+              No projects yet
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {projectData.map((project) => (
+                <div
+                  key={project.id}
+                  className="flex items-center gap-4 p-4 bg-card border border-border rounded-md hover:border-foreground/20 transition-colors group"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate group-hover:text-foreground transition-colors">
+                      {project.title}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Updated {timeAgo(project.updatedAt)}</p>
+                  </div>
+                  <StatusBadge status={project.status} />
                 </div>
-                <StatusBadge status={project.status} />
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Activity feed — takes 2 cols */}
@@ -98,19 +148,8 @@ export default function ClientDashboard() {
             <h2 className="text-lg font-medium">Activity</h2>
             <MiniChart data={weeklyActivity} width={80} height={28} />
           </div>
-          <div className="space-y-1">
-            {recentActivity.map((item) => (
-              <div
-                key={item.id}
-                className="flex gap-3 p-3 rounded-md hover:bg-accent/30 transition-colors"
-              >
-                <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-foreground/30 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm leading-relaxed">{item.text}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{item.time}</p>
-                </div>
-              </div>
-            ))}
+          <div className="p-6 text-center text-sm text-muted-foreground border border-dashed border-border rounded-md">
+            Activity feed will populate as you use the platform.
           </div>
         </div>
       </div>

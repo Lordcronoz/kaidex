@@ -51,6 +51,8 @@ export const authConfig: NextAuthConfig = {
         (session.user as any).role = token.role;
         (session.user as any).id = token.id;
       }
+      // Expose the JWT for API calls
+      (session as any).accessToken = token;
       return session;
     },
     async authorized({ auth, request }) {

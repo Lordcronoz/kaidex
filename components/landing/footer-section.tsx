@@ -20,7 +20,7 @@ const footerLinks = {
     { name: "About", href: "#" },
     { name: "Blog", href: "#" },
     { name: "Careers", href: "#", badge: "Hiring" },
-    { name: "Contact", href: "#" },
+    { name: "Contact", href: "#contact" },
   ],
   Legal: [
     { name: "Privacy", href: "#" },

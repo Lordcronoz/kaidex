@@ -35,6 +35,7 @@ services:
       NODE_ENV: development
       FRONTEND_URL: http://localhost:3000
       ENCRYPTION_KEY: dev-encryption-key-change-in-production
+      NEXTAUTH_SECRET: dev-secret-change-in-production-use-openssl-rand-base64-32
     ports:
       - "4000:4000"
 

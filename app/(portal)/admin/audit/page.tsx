@@ -3,40 +3,51 @@
 import { useState } from "react";
 import { DataTable } from "@/components/portal/data-table";
 import { StatusBadge } from "@/components/portal/status-badge";
+import { useApi } from "@/hooks/use-api";
 
 interface AuditEntry {
   id: string;
-  timestamp: string;
-  user: string;
+  userId: string;
   action: string;
   target: string;
   targetId: string;
-  ip: string;
+  metadata: any;
+  ipAddress: string | null;
+  timestamp: string;
+  user?: { email: string; name: string | null };
 }
 
-const auditLog: AuditEntry[] = [
-  { id: "1", timestamp: "2026-07-08 15:22:01", user: "sarah@meridian.io", action: "UPDATE", target: "Project", targetId: "prj_abc123", ip: "192.168.1.42" },
-  { id: "2", timestamp: "2026-07-08 15:00:33", user: "admin@kaidex.io", action: "CREATE", target: "Invoice", targetId: "inv_def456", ip: "10.0.0.1" },
-  { id: "3", timestamp: "2026-07-08 14:45:12", user: "marcus@flux.co", action: "DELETE", target: "Deliverable", targetId: "dlv_ghi789", ip: "172.16.0.55" },
-  { id: "4", timestamp: "2026-07-08 13:30:00", user: "admin@kaidex.io", action: "UPDATE", target: "User", targetId: "usr_jkl012", ip: "10.0.0.1" },
-  { id: "5", timestamp: "2026-07-08 12:15:45", user: "elena@beacon.ai", action: "CREATE", target: "Message", targetId: "msg_mno345", ip: "203.0.113.10" },
-  { id: "6", timestamp: "2026-07-08 11:02:18", user: "admin@kaidex.io", action: "CREATE", target: "Project", targetId: "prj_pqr678", ip: "10.0.0.1" },
-  { id: "7", timestamp: "2026-07-08 10:30:00", user: "james@prism.io", action: "UPDATE", target: "Project", targetId: "prj_stu901", ip: "198.51.100.22" },
-  { id: "8", timestamp: "2026-07-07 23:55:12", user: "sarah@meridian.io", action: "CREATE", target: "Deliverable", targetId: "dlv_vwx234", ip: "192.168.1.42" },
-];
+interface AuditResponse {
+  data: AuditEntry[];
+  meta: { total: number };
+}
 
 const filters = ["All", "CREATE", "UPDATE", "DELETE"];
+
+function formatTimestamp(dateStr: string) {
+  return new Date(dateStr).toLocaleString("en-US", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+}
 
 const columns = [
   {
     key: "timestamp" as const,
     label: "Timestamp",
     className: "font-mono text-xs",
+    render: (e: AuditEntry) => <span>{formatTimestamp(e.timestamp)}</span>,
   },
   {
-    key: "user" as const,
+    key: "userId" as const,
     label: "User",
     className: "font-mono text-xs",
+    render: (e: AuditEntry) => <span>{e.user?.email || e.userId}</span>,
   },
   {
     key: "action" as const,
@@ -59,15 +70,20 @@ const columns = [
     className: "font-mono text-xs text-muted-foreground",
   },
   {
-    key: "ip" as const,
+    key: "ipAddress" as const,
     label: "IP Address",
     className: "font-mono text-xs text-muted-foreground",
+    render: (e: AuditEntry) => <span>{e.ipAddress || "—"}</span>,
   },
 ];
 
 export default function AuditPage() {
   const [filter, setFilter] = useState("All");
-  const filtered = filter === "All" ? auditLog : auditLog.filter((e) => e.action === filter);
+  const { data, loading, error } = useApi<AuditResponse>("/audit-logs");
+
+  // Filter client-side by action type
+  const allEntries = data?.data || [];
+  const filtered = filter === "All" ? allEntries : allEntries.filter((e) => e.action === filter);
 
   return (
     <div className="space-y-6">
@@ -98,7 +114,19 @@ export default function AuditPage() {
         </span>
       </div>
 
-      <DataTable columns={columns} data={filtered} />
+      {loading ? (
+        <div className="space-y-2">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="h-12 bg-accent/30 rounded-md animate-pulse" />
+          ))}
+        </div>
+      ) : error ? (
+        <div className="p-4 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-md">
+          {error}
+        </div>
+      ) : (
+        <DataTable columns={columns} data={filtered} emptyMessage="No audit entries found" />
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   LayoutDashboard,
@@ -81,7 +81,13 @@ export default function PortalLayout({
 
         {/* User section */}
         <div className="p-3 border-t border-border">
-          <button className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors w-full">
+          <button
+            onClick={async () => {
+              const { signOut } = await import("next-auth/react");
+              await signOut({ callbackUrl: "/login" });
+            }}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors w-full"
+          >
             <LogOut className="w-4 h-4" />
             <span>Sign Out</span>
           </button>

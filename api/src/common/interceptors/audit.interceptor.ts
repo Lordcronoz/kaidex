@@ -9,12 +9,13 @@ import { PrismaService } from '../../prisma/prisma.service';
 
 /**
  * Automatically logs all mutating API calls (POST/PUT/PATCH/DELETE) to the audit_logs table.
+ * For UPDATE and DELETE operations, captures before/after snapshots of the target record.
  */
 @Injectable()
 export class AuditInterceptor implements NestInterceptor {
   constructor(private prisma: PrismaService) {}
 
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  async intercept(context: ExecutionContext, next: CallHandler): Promise<Observable<any>> {
     const request = context.switchToHttp().getRequest();
     const method = request.method;
 
@@ -31,21 +32,39 @@ export class AuditInterceptor implements NestInterceptor {
     const handler = context.getHandler().name;
     const controller = context.getClass().name;
     const action = this.methodToAction(method);
+    const target = controller.replace('Controller', '');
+    const targetId = request.params?.id || request.params?.delId || 'unknown';
+
+    // Capture "before" snapshot for UPDATE and DELETE operations
+    let beforeSnapshot: any = null;
+    if ((action === 'UPDATE' || action === 'DELETE') && targetId !== 'unknown') {
+      beforeSnapshot = await this.fetchRecord(target, targetId);
+    }
 
     return next.handle().pipe(
       tap(async (responseData) => {
         try {
+          // Capture "after" snapshot for UPDATE operations
+          let afterSnapshot: any = null;
+          if (action === 'UPDATE' && targetId !== 'unknown') {
+            afterSnapshot = await this.fetchRecord(target, targetId);
+          } else if (action === 'CREATE' && responseData?.id) {
+            afterSnapshot = responseData;
+          }
+
           await this.prisma.auditLog.create({
             data: {
               userId: user.id,
               action,
-              target: controller.replace('Controller', ''),
-              targetId: responseData?.id || request.params?.id || 'unknown',
+              target,
+              targetId: responseData?.id || targetId,
               metadata: {
                 handler,
                 method,
                 body: this.sanitizeBody(request.body),
                 params: request.params,
+                before: beforeSnapshot ? this.sanitizeBody(beforeSnapshot) : null,
+                after: afterSnapshot ? this.sanitizeBody(afterSnapshot) : null,
               },
               ipAddress: request.ip || request.headers['x-forwarded-for']?.toString(),
             },
@@ -56,6 +75,23 @@ export class AuditInterceptor implements NestInterceptor {
         }
       }),
     );
+  }
+
+  /**
+   * Attempt to fetch the current state of a record for before/after comparison.
+   * Falls back gracefully if the model/record doesn't exist.
+   */
+  private async fetchRecord(target: string, id: string): Promise<any> {
+    try {
+      const modelName = target.charAt(0).toLowerCase() + target.slice(1);
+      const model = (this.prisma as any)[modelName];
+      if (model && typeof model.findUnique === 'function') {
+        return await model.findUnique({ where: { id } });
+      }
+    } catch {
+      // Model might not exist or ID might be invalid — fail silently
+    }
+    return null;
   }
 
   private methodToAction(method: string): string {

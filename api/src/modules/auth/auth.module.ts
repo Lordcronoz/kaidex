@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { NextAuthGuard } from '../../common/guards/nextauth.guard';
 import { RbacGuard } from '../../common/guards/rbac.guard';
+import { AuthController } from './auth.controller';
+import { AuthService } from './auth.service';
 
 @Module({
   imports: [
@@ -11,7 +13,8 @@ import { RbacGuard } from '../../common/guards/rbac.guard';
       limit: 5,
     }]),
   ],
-  providers: [NextAuthGuard, RbacGuard],
-  exports: [NextAuthGuard, RbacGuard],
+  controllers: [AuthController],
+  providers: [AuthService, NextAuthGuard, RbacGuard],
+  exports: [AuthService, NextAuthGuard, RbacGuard],
 })
 export class AuthModule {}
