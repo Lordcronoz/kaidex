@@ -20,6 +20,7 @@ Thumbs.db
 
 # Prisma
 api/prisma/migrations/dev/
+api/src/generated/
 
 # Docker
 docker-compose.override.yml

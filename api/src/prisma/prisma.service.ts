@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../generated/client';
 import { requestContext } from '../common/context/request-context';
 
 /** Models that have a `userId` column and should be scoped per-client */
