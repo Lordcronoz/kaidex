@@ -4,7 +4,7 @@ import * as bcrypt from 'bcryptjs';
 import * as otplib from 'otplib';
 import { loginSchema } from '@shared/schemas/auth.schema';
 
-const authenticator = (otplib as any).authenticator || otplib.authenticator;
+const authenticator = (otplib as any).authenticator;
 
 @Injectable()
 export class AuthService {
