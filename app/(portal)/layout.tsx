@@ -13,6 +13,7 @@ import {
   LogOut,
   Shield,
   ChevronRight,
+  Database,
 } from "lucide-react";
 
 const clientNav = [
@@ -27,6 +28,7 @@ const adminNav = [
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/audit", label: "Audit Log", icon: ScrollText },
   { href: "/admin/reports", label: "Reports", icon: BarChart3 },
+  { href: "http://localhost:5173", label: "Database", icon: Database, external: true },
 ];
 
 export default function PortalLayout({
@@ -59,15 +61,34 @@ export default function PortalLayout({
         <nav className="flex-1 px-3 py-4 space-y-1">
           {navItems.map((item) => {
             const isActive = pathname === item.href;
+            const isExternal = (item as any).external;
+            const linkClasses = `flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors group ${
+              isActive
+                ? "bg-accent text-foreground"
+                : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+            }`;
+
+            if (isExternal) {
+              return (
+                <a
+                  key={item.href}
+                  href={item.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={linkClasses}
+                >
+                  <item.icon className="w-4 h-4 flex-shrink-0" />
+                  <span className="flex-1">{item.label}</span>
+                  <svg className="w-3 h-3 text-muted-foreground" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
+                </a>
+              );
+            }
+
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors group ${
-                  isActive
-                    ? "bg-accent text-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                }`}
+                className={linkClasses}
               >
                 <item.icon className="w-4 h-4 flex-shrink-0" />
                 <span className="flex-1">{item.label}</span>

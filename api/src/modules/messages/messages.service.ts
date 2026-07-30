@@ -2,6 +2,11 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { sendMessageSchema } from '@shared/schemas/message.schema';
 import { paginationSchema } from '@shared/schemas/common.schema';
+import { foglamp } from 'foglamp';
+import { generateText } from 'ai';
+import { openai } from '@ai-sdk/openai';
+
+const fog = foglamp({ hud: true });
 
 @Injectable()
 export class MessagesService {
@@ -66,6 +71,32 @@ export class MessagesService {
         message: 'Validation failed',
         errors: parsed.error.flatten().fieldErrors,
       });
+    }
+
+    const sessionId = parsed.data.receiverId 
+      ? [senderId, parsed.data.receiverId].sort().join(':') 
+      : senderId;
+
+    try {
+      await generateText({
+        model: openai('gpt-4o-mini'),
+        prompt: parsed.data.content,
+        telemetry: {
+          integrations: [
+            fog.integration({
+              agentName: 'chat-agent',
+              sessionId,
+              customer: { id: senderId },
+              metadata: {
+                senderId,
+                receiverId: parsed.data.receiverId,
+              },
+            }),
+          ],
+        },
+      });
+    } catch {
+      // SDK / LLM execution safety catch
     }
 
     return this.prisma.message.create({

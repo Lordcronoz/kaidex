@@ -2,6 +2,11 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../prisma/prisma.service';
 import { createProjectSchema } from '@shared/schemas/project.schema';
 import { paginationSchema } from '@shared/schemas/common.schema';
+import { foglamp } from 'foglamp';
+import { generateText } from 'ai';
+import { openai } from '@ai-sdk/openai';
+
+const fog = foglamp({ hud: true });
 
 @Injectable()
 export class ProjectsService {
@@ -70,10 +75,35 @@ export class ProjectsService {
       });
     }
 
-    return this.prisma.project.create({
+    const createdProject = await this.prisma.project.create({
       data: parsed.data,
       include: { deliverables: true },
     });
+
+    try {
+      await generateText({
+        model: openai('gpt-4o-mini'),
+        prompt: `Analyze and plan project: ${createdProject.title} - ${createdProject.description || ''}`,
+        telemetry: {
+          integrations: [
+            fog.integration({
+              agentName: 'project-planner',
+              workflowName: 'project-creation-workflow',
+              workflowRunId: createdProject.id,
+              customer: { id: parsed.data.userId },
+              metadata: {
+                projectTitle: createdProject.title,
+                status: createdProject.status,
+              },
+            }),
+          ],
+        },
+      });
+    } catch {
+      // SDK / LLM execution safety catch
+    }
+
+    return createdProject;
   }
 
   /**
